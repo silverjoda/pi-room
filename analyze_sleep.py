@@ -55,7 +55,8 @@ def capture_every_n_sec_until(camera):
 def start_audio_recording(d):
     logging.info("Starting audio capture in separate thread using 'arecord'. ")
     # arecord --device=hw:1,0 --format S16_LE --rate 44100 -V mono -c1 voice.wav
-    p = subprocess.Popen(["arecord --device=hw:1,0 --format S16_LE --rate 44100 -c1 audio/Day-{}.wav".format(d)])
+    duration = (CAPTURE_END_HOUR - CAPTURE_BEGIN_HOUR) * 3600
+    p = subprocess.Popen(["arecord --device=hw:1,0 --duration={}  --format S16_LE --rate 8000 -c1 audio/Day-{}.wav".format(duration, d)])
     return p
 
 def setup_camera():
@@ -79,7 +80,7 @@ def start_schedule(camera):
         while datetime.datetime.now().hour < CAPTURE_BEGIN_HOUR: time.sleep(10)
 
         # Launch audio recording in separate thread
-        start_audio_recording(d)
+        p = start_audio_recording(d)
 
         # Start capturing until end hour
         images = capture_every_n_sec_until(camera)
