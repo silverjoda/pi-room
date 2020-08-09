@@ -6,6 +6,7 @@ import time
 import numpy as np
 from picamera import PiCamera
 import matplotlib.pyplot as plt
+import subprocess
 
 camera_resolution = (1024, 768)
 N_DAYS = 14
@@ -43,13 +44,19 @@ def take_picture(camera):
     return output_float
 
 def capture_every_n_sec_until(camera):
-    logging.info("Started capturing with interval {}s until {}'th hour".format(CAPTURE_SLEEP_INTERVAL_SECS, CAPTURE_END_HOUR))
+    logging.info("Starting capturing with interval {}s until {}'th hour".format(CAPTURE_SLEEP_INTERVAL_SECS, CAPTURE_END_HOUR))
     pics = []
     while datetime.datetime.now().hour < CAPTURE_END_HOUR:
         pics.append(take_picture(camera))
         time.sleep(CAPTURE_SLEEP_INTERVAL_SECS)
     logging.info("Collected {} images. ".format(len(pics)))
     return np.array(pics)
+
+def start_audio_recording(d):
+    logging.info("Starting audio capture in separate thread using 'arecord'. ")
+    # arecord --device=hw:1,0 --format S16_LE --rate 44100 -V mono -c1 voice.wav
+    p = subprocess.Popen(["arecord --device=hw:1,0 --format S16_LE --rate 44100 -c1 audio/Day-{}.wav".format(d)])
+    return p
 
 def setup_camera():
     logging.info("Setting up camera. ")
@@ -70,6 +77,9 @@ def start_schedule(camera):
 
         # Wait for the initial capture hour to begin. Sleep in between so as not to waste CPU power
         while datetime.datetime.now().hour < CAPTURE_BEGIN_HOUR: time.sleep(10)
+
+        # Launch audio recording in separate thread
+        start_audio_recording(d)
 
         # Start capturing until end hour
         images = capture_every_n_sec_until(camera)
