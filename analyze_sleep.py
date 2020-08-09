@@ -1,9 +1,11 @@
-import logging
-import time
-import datetime
 
+import datetime
+import logging
+import sys
+import time
 import numpy as np
 from picamera import PiCamera
+import matplotlib.pyplot as plt
 
 camera_resolution = (1024, 768)
 N_DAYS = 14
@@ -11,11 +13,27 @@ CAPTURE_BEGIN_HOUR = 0
 CAPTURE_END_HOUR = 7
 CAPTURE_SLEEP_INTERVAL_SECS = 60
 
-def analyze(pic_array):
+logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")),
+                    level=logging.INFO)
+
+def analyze(pic_array, d):
     N = len(pic_array)
     logging.info("Analyzing image sequence of len={}. ".format(N))
 
-    # TODO: Calc average delta between images and plot all deltas, as well as points with high delta which signify movement
+    deltas = []
+    for i in range(N - 1):
+        delta = np.mean(np.square(pic_array[i + 1] - pic_array[i]))
+        deltas.append(delta)
+
+    t = np.linspace(CAPTURE_BEGIN_HOUR, CAPTURE_END_HOUR, N - 1)
+    fig, ax = plt.subplots()
+    ax.plot(t, deltas)
+    plt.xlabel('Hours')
+    plt.ylabel('Neighboring delta')
+    plt.margins(x=0)
+
+    # Save plot to image format
+    plt.savefig("analysis/images_Day-{}.png".format(d))
 
 def take_picture(camera):
     output = np.empty((camera_resolution[1], camera_resolution[0], 3), dtype=np.uint8)
@@ -57,7 +75,13 @@ def start_schedule(camera):
         images = capture_every_n_sec_until(camera)
 
         save_images(images, d)
-        analyze(images)
+        analyze(images, d)
+
+def test():
+    logging.info("Testing. ")
+    images = np.random.rand(300, 256, 256)
+    analyze(images, 0)
+    exit()
 
 if __name__ == '__main__':
     logging.info("Starting sleep analysis script, N_DAYS = {}. ".format(N_DAYS))
