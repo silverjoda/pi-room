@@ -7,15 +7,14 @@ import numpy as np
 from picamera import PiCamera
 import matplotlib.pyplot as plt
 import subprocess
+import os
+from PIL import Image
 
 camera_resolution = (1024, 768)
 N_DAYS = 14
 CAPTURE_BEGIN_HOUR = 0
 CAPTURE_END_HOUR = 7
 CAPTURE_SLEEP_INTERVAL_SECS = 60
-
-logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")),
-                    level=logging.INFO)
 
 def analyze(pic_array, d):
     N = len(pic_array)
@@ -88,6 +87,14 @@ def start_schedule(camera):
         save_images(images, d)
         analyze(images, d)
 
+def shoot_and_save(img_path):
+    cam = setup_camera()
+    pic = take_picture(cam)
+    im = Image.fromarray(A)
+    im.save(img_path)
+    print(f"Shot and saved image to {img_path}")
+
+
 def test():
     logging.info("Testing. ")
     images = np.random.rand(300, 256, 256)
@@ -95,6 +102,16 @@ def test():
     exit()
 
 if __name__ == '__main__':
+    data_folders = ["audio", "logs", "raw_images"]
+    for df in data_folders:
+        if not os.path.exists(df):
+             os.makedirs(df)
+    
+    logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")), level=logging.INFO)
+
+    shoot_and_save("test.jpg")
+
+    exit()
     logging.info("Starting sleep analysis script, N_DAYS = {}. ".format(N_DAYS))
     camera = setup_camera()
     start_schedule(camera)
