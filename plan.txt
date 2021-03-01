@@ -1,0 +1,5 @@
+todo:
+# Change camera to suitable resolution
+# Change to gS instead of rgb
+# Change to uint8 instead of float
+# Add image saving (per image), as well as change to npz from npy
