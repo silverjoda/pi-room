@@ -12,8 +12,8 @@ from PIL import Image
 
 camera_resolution = (1024, 768)
 N_DAYS = 1
-CAPTURE_BEGIN_HOUR = 17 # 0
-CAPTURE_END_HOUR = 18 # 7
+CAPTURE_BEGIN_HOUR = 0 # 0
+CAPTURE_END_HOUR = 7 # 7
 CAPTURE_SLEEP_INTERVAL_SECS = 60
 
 def analyze(pic_array, d):
@@ -43,7 +43,7 @@ def take_picture(camera):
     return output_float
 
 def capture_every_n_sec_until(camera):
-    logging.info("Starting capturing with interval {}s until {}'th hour".format(CAPTURE_SLEEP_INTERVAL_SECS, CAPTURE_END_HOUR))
+    logging.info("Starting camera capturing with interval {}s until {}'th hour".format(CAPTURE_SLEEP_INTERVAL_SECS, CAPTURE_END_HOUR))
     pics = []
     while datetime.datetime.now().hour < CAPTURE_END_HOUR:
         pics.append(take_picture(camera))
@@ -53,9 +53,8 @@ def capture_every_n_sec_until(camera):
 
 def start_audio_recording(d):
     logging.info("Starting audio capture in separate thread using 'arecord'. ")
-    # arecord -D plughw:1,0 --format S16_LE --rate 44100 -V mono -c1 voice.wav
     duration = (CAPTURE_END_HOUR - CAPTURE_BEGIN_HOUR) * 3600
-    p = subprocess.Popen(["arecord -D plughw:1,0 --duration={} --format S16_LE --rate 8000 -c1 audio/Day-{}.wav".format(duration, d)])
+    p = subprocess.Popen(f"arecord -D plughw:1,0 --duration={duration} --format S16_LE --rate 8000 -V mono -c1 audio/Day-{d}.wav", shell=True)
     return p
 
 def setup_camera():
@@ -107,11 +106,12 @@ if __name__ == '__main__':
              os.makedirs(df)
     
     logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")), level=logging.INFO)
-    logging.info("Setting up camera. ")
     camera = setup_camera()
     
     logging.info("Starting sleep analysis, N_DAYS = {}. ".format(N_DAYS))
     start_schedule(camera)
+
+    logging.info("Done. ")
 
 
 
