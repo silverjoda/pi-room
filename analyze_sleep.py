@@ -11,9 +11,9 @@ import os
 from PIL import Image
 
 camera_resolution = (1024, 768)
-N_DAYS = 14
-CAPTURE_BEGIN_HOUR = 0
-CAPTURE_END_HOUR = 7
+N_DAYS = 1
+CAPTURE_BEGIN_HOUR = 17 # 0
+CAPTURE_END_HOUR = 18 # 7
 CAPTURE_SLEEP_INTERVAL_SECS = 60
 
 def analyze(pic_array, d):
@@ -53,9 +53,9 @@ def capture_every_n_sec_until(camera):
 
 def start_audio_recording(d):
     logging.info("Starting audio capture in separate thread using 'arecord'. ")
-    # arecord --device=hw:1,0 --format S16_LE --rate 44100 -V mono -c1 voice.wav
+    # arecord -D plughw:1,0 --format S16_LE --rate 44100 -V mono -c1 voice.wav
     duration = (CAPTURE_END_HOUR - CAPTURE_BEGIN_HOUR) * 3600
-    p = subprocess.Popen(["arecord --device=hw:1,0 --duration={}  --format S16_LE --rate 8000 -c1 audio/Day-{}.wav".format(duration, d)])
+    p = subprocess.Popen(["arecord -D plughw:1,0 --duration={} --format S16_LE --rate 8000 -c1 audio/Day-{}.wav".format(duration, d)])
     return p
 
 def setup_camera():
@@ -90,10 +90,9 @@ def start_schedule(camera):
 def shoot_and_save(img_path):
     cam = setup_camera()
     pic = take_picture(cam)
-    im = Image.fromarray(A)
+    im = Image.fromarray((pic * 255).astype(np.uint8))
     im.save(img_path)
     print(f"Shot and saved image to {img_path}")
-
 
 def test():
     logging.info("Testing. ")
@@ -108,12 +107,10 @@ if __name__ == '__main__':
              os.makedirs(df)
     
     logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")), level=logging.INFO)
-
-    shoot_and_save("test.jpg")
-
-    exit()
-    logging.info("Starting sleep analysis script, N_DAYS = {}. ".format(N_DAYS))
+    logging.info("Setting up camera. ")
     camera = setup_camera()
+    
+    logging.info("Starting sleep analysis, N_DAYS = {}. ".format(N_DAYS))
     start_schedule(camera)
 
 

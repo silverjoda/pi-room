@@ -1,1 +1,1 @@
-arecord -D hw:U0x46d0x825,0 -d 3 -f cd test.wav -c 1
+arecord -D plughw:1,0 --format S16_LE --duration=5 --rate 8000 -c1 test.wav
