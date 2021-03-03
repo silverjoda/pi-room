@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 import subprocess
 import os
 from PIL import Image
+from threading import Thread
 
-camera_resolution = (1024, 768)
+camera_resolution = (640, 480)
 N_DAYS = 1
 CAPTURE_BEGIN_HOUR = 0  # 0
 CAPTURE_END_HOUR = 7  # 7
@@ -35,28 +36,30 @@ def analyze(pic_array, d):
     plt.savefig("analysis/images_Day-{}.png".format(d))
 
 def take_picture(camera):
-    output = np.empty((camera_resolution[1], camera_resolution[0], 3), dtype=np.uint8)
-    camera.capture(output, 'rgb')
-    output_float = (output.astype(np.float32) / 255.)
-    logging.debug("Took image at {}. Min: {}, Max: {}. ".format(time.time(), output_float.min(), output_float.max()))
-    return output_float
+    pic = take_picture(cam)
+    im = Image.fromarray((pic * 255).astype(np.uint8))
+    im = im.resize((320, 240))
+    logging.debug("Took image at {}. Min: {}, Max: {}. ".format(time.time(), im.min(), im.max()))
+    return im
 
 def capture_every_n_sec_until(camera):
     logging.info("Starting camera capturing with interval {}s until {}'th hour".format(CAPTURE_SLEEP_INTERVAL_SECS,
                                                                                        CAPTURE_END_HOUR))
     pics = []
+    pic_ctr = 0
     while datetime.datetime.now().hour < CAPTURE_END_HOUR:
-        pics.append(take_picture(camera))
+        im = take_picture(camera)
+        pics.append(im)
+        im.save()
         time.sleep(CAPTURE_SLEEP_INTERVAL_SECS)
     logging.info("Collected {} images. ".format(len(pics)))
     return np.array(pics)
 
 def start_audio_recording(d):
     logging.info("Starting audio capture in separate thread using 'arecord'. ")
-    duration = (CAPTURE_END_HOUR - CAPTURE_BEGIN_HOUR) * 3600
-    p = subprocess.Popen(
-        f"arecord -D plughw:1,0 --duration={duration} --format S16_LE --rate 8000 -V mono -c1 audio/Day-{d}.wav",
-        shell=True)
+    for i in range(CAPTURE_END_HOUR - CAPTURE_BEGIN_HOUR):
+        duration = 3600
+        p = subprocess.Popen(f"arecord -D plughw:1,0 --duration={duration} --format S16_LE --rate 8000 -V mono -c1 audio/Day-{d}-hour-{i + CAPTURE_BEGIN_HOUR}.wav", shell=True)
     return p
 
 def setup_camera():
@@ -67,8 +70,8 @@ def setup_camera():
 
 def save_images(images, d):
     logging.info("Saving images. ")
-    save_dir = "raw_images/images_Day-{}.npy".format(d)
-    np.save(save_dir, images)
+    save_dir = "npz_images/images_Day-{}.npy".format(d)
+    np.savez(save_dir, images)
 
 def start_schedule(camera):
     logging.info("Starting schedule. Current time: {}. ".format(datetime.datetime.now()))
@@ -80,7 +83,8 @@ def start_schedule(camera):
         while datetime.datetime.now().hour < CAPTURE_BEGIN_HOUR: time.sleep(10)
 
         # Launch audio recording in separate thread
-        p = start_audio_recording(d)
+        #thread = Thread(target=start_audio_recording, args = (d, ))
+        #thread.start()
 
         # Start capturing until end hour
         images = capture_every_n_sec_until(camera)
@@ -88,10 +92,13 @@ def start_schedule(camera):
         save_images(images, d)
         analyze(images, d)
 
+        thread.join()
+
 def shoot_and_save(img_path):
     cam = setup_camera()
     pic = take_picture(cam)
     im = Image.fromarray((pic * 255).astype(np.uint8))
+    im = im.resize((320, 240))
     im.save(img_path)
     print(f"Shot and saved image to {img_path}")
 
@@ -109,9 +116,6 @@ if __name__ == '__main__':
 
     logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")), level=logging.INFO)
     camera = setup_camera()
-
-    shoot_and_save(".")
-    exit()
 
     logging.info("Starting sleep analysis, N_DAYS = {}. ".format(N_DAYS))
     start_schedule(camera)
