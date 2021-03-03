@@ -9,115 +9,125 @@ import subprocess
 import os
 from PIL import Image
 from threading import Thread
+import yaml
 
-camera_resolution = (640, 480)
-N_DAYS = 1
-CAPTURE_BEGIN_HOUR = 0  # 0
-CAPTURE_END_HOUR = 7  # 7
-CAPTURE_SLEEP_INTERVAL_SECS = 60
+class SleepCapturer:
+    def __init__(self, config):
+        self.config = config
+        self.camera = self.setup_camera()
 
-def analyze(pic_array, d):
-    N = len(pic_array)
-    logging.info("Analyzing image sequence of len={}. ".format(N))
+    def setup_camera(self):
+        logging.info("Setting up camera. ")
+        self.camera = PiCamera()
+        self.camera_resolution = eval(config["camera_resolution"])
+        self.resized_resolution = eval(config["resized_resolution"])
+        self.camera.resolution = self.camera_resolution
 
-    deltas = []
-    for i in range(N - 1):
-        delta = np.mean(np.square(pic_array[i + 1] - pic_array[i]))
-        deltas.append(delta)
+    def take_picture(self):
+        im = np.empty((self.camera_resolution[1], self.camera_resolution[0], 3), dtype=np.uint8)
+        self.camera.capture(im, 'rgb', resize=(self.resized_resolution[0], self.resized_resolution[1]))
+        logging.debug("Took image at {}. Min: {}, Max: {}. ".format(time.time(), im.min(), im.max()))
+        return im
 
-    t = np.linspace(CAPTURE_BEGIN_HOUR, CAPTURE_END_HOUR, N - 1)
-    fig, ax = plt.subplots()
-    ax.plot(t, deltas)
-    plt.xlabel('Hours')
-    plt.ylabel('Neighboring delta')
-    plt.margins(x=0)
+    def capture_image_every_interval_until(self, day):
+        logging.info("Starting camera capturing with interval {}s until {}'th hour".format(self.config["capture_sleep_interval_secs"],
+                                                                                           self.config["capture_end_hour"]))
+        pics_list_gs = []
+        while datetime.datetime.now().hour < self.config["capture_end_hour"]:
+            im = self.take_picture()
 
-    # Save plot to image format
-    plt.savefig("analysis/images_Day-{}.png".format(d))
+            # Make grayscale image and append to list
+            im_gs = np.mean(im, 2)
+            pics_list_gs.append(im_gs)
 
-def take_picture(camera):
-    pic = take_picture(cam)
-    im = Image.fromarray((pic * 255).astype(np.uint8))
-    im = im.resize((320, 240))
-    logging.debug("Took image at {}. Min: {}, Max: {}. ".format(time.time(), im.min(), im.max()))
-    return im
+            # Save image raw to disk
+            save_path = f"raw_images/day-{day}/hour_{datetime.datetime.now().hour}_img{len(pics_list_gs)}"
+            im_pil = Image.fromarray(im)
+            im_pil.save(save_path)
 
-def capture_every_n_sec_until(camera):
-    logging.info("Starting camera capturing with interval {}s until {}'th hour".format(CAPTURE_SLEEP_INTERVAL_SECS,
-                                                                                       CAPTURE_END_HOUR))
-    pics = []
-    pic_ctr = 0
-    while datetime.datetime.now().hour < CAPTURE_END_HOUR:
-        im = take_picture(camera)
-        pics.append(im)
-        im.save()
-        time.sleep(CAPTURE_SLEEP_INTERVAL_SECS)
-    logging.info("Collected {} images. ".format(len(pics)))
-    return np.array(pics)
+            time.sleep(self.config["capture_sleep_interval_secs"])
+        logging.info("Collected {} images. ".format(len(pics_list_gs)))
+        return np.array(pics_list_gs, dtype=np.uint8)
 
-def start_audio_recording(d):
-    logging.info("Starting audio capture in separate thread using 'arecord'. ")
-    for i in range(CAPTURE_END_HOUR - CAPTURE_BEGIN_HOUR):
-        duration = 3600
-        p = subprocess.Popen(f"arecord -D plughw:1,0 --duration={duration} --format S16_LE --rate 8000 -V mono -c1 audio/Day-{d}-hour-{i + CAPTURE_BEGIN_HOUR}.wav", shell=True)
-    return p
+    def start_audio_recording(self, day):
+        logging.info("Starting audio capture in separate thread using 'arecord'. ")
+        for i in range(self.config["capture_end_hour"] - self.config["capture_begin_hour"]):
+            duration = 3600
+            save_path = f"audio/day-{day}/hour-{i + self.config['capture_begin_hour']}.wav"
+            subprocess.Popen(f"arecord -D plughw:1,0 --duration={duration} --format S16_LE --rate 8000 -V mono -c1 {save_path}", shell=True)
 
-def setup_camera():
-    logging.info("Setting up camera. ")
-    camera = PiCamera()
-    camera.resolution = camera_resolution
-    return camera
+    def start_schedule(self):
+        logging.info(f"Starting sleep capture schedule, n_days = {config['n_days']}, current time: {datetime.datetime.now()}. ")
 
-def save_images(images, d):
-    logging.info("Saving images. ")
-    save_dir = "npz_images/images_Day-{}.npy".format(d)
-    np.savez(save_dir, images)
+        for d in range(self.config["n_days"]):
+            # Make dirs for that day
+            data_folders = [f"raw_images/day-{d}", f"audio/day-{d}"]
+            for df in data_folders:
+                if not os.path.exists(df):
+                    os.makedirs(df)
 
-def start_schedule(camera):
-    logging.info("Starting schedule. Current time: {}. ".format(datetime.datetime.now()))
+            logging.info("Day: {}, waiting until {}'th hour to start capture. ".format(d, CAPTURE_BEGIN_HOUR))
 
-    for d in range(N_DAYS):
-        logging.info("Day: {}, waiting until {}'th hour to start capture. ".format(d, CAPTURE_BEGIN_HOUR))
+            # Wait for the initial capture hour to begin. Sleep in between so as not to waste CPU power
+            while datetime.datetime.now().hour < CAPTURE_BEGIN_HOUR: time.sleep(10)
 
-        # Wait for the initial capture hour to begin. Sleep in between so as not to waste CPU power
-        while datetime.datetime.now().hour < CAPTURE_BEGIN_HOUR: time.sleep(10)
+            # Launch audio recording in separate thread
+            #thread = Thread(target=start_audio_recording, args = (d, ))
+            #thread.start()
 
-        # Launch audio recording in separate thread
-        #thread = Thread(target=start_audio_recording, args = (d, ))
-        #thread.start()
+            # Start capturing until end hour
+            images = self.capture_image_every_interval_until()
 
-        # Start capturing until end hour
-        images = capture_every_n_sec_until(camera)
+            # Save compressed images for future analysis
+            logging.info("Saving images. ")
+            save_dir = f"npz_images/images_day-{d}.npy"
+            np.savez(save_dir, images)
 
-        save_images(images, d)
-        analyze(images, d)
+            # Perform analysis on daily images
+            analyze(images, d)
 
-        thread.join()
+            # Wait for audio thread to join
+            logging.debug("Waiting for audio thread to join. ")
+            thread.join()
 
-def shoot_and_save(img_path):
-    cam = setup_camera()
-    pic = take_picture(cam)
-    im = Image.fromarray((pic * 255).astype(np.uint8))
-    im = im.resize((320, 240))
-    im.save(img_path)
-    print(f"Shot and saved image to {img_path}")
+    def analyze(pic_array, d):
+        N = len(pic_array)
+        logging.info("Analyzing image sequence of len={}. ".format(N))
 
-def test():
-    logging.info("Testing. ")
-    images = np.random.rand(300, 256, 256)
-    analyze(images, 0)
-    exit()
+        deltas = []
+        for i in range(N - 1):
+            delta = np.mean(np.square(pic_array[i + 1] - pic_array[i]))
+            deltas.append(delta)
+
+        t = np.linspace(CAPTURE_BEGIN_HOUR, CAPTURE_END_HOUR, N - 1)
+        fig, ax = plt.subplots()
+        ax.plot(t, deltas)
+        plt.xlabel('Hours')
+        plt.ylabel('Neighboring delta')
+        plt.margins(x=0)
+
+        # Save plot to image format
+        plt.savefig("analysis/images_Day-{}.png".format(d))
+
+    def test_shoot_and_save(self, path="tst.png"):
+        im = self.take_picture()
+        im_pil = Image.fromarray(im)
+        im_pil.save(path)
+        print(f"Shot and saved image to {path}")
+
 
 if __name__ == '__main__':
-    data_folders = ["audio", "logs", "raw_images"]
+    data_folders = ["audio", "logs", "raw_images", "npz_images", "analysis", "scripts"]
     for df in data_folders:
         if not os.path.exists(df):
             os.makedirs(df)
 
-    logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")), level=logging.INFO)
-    camera = setup_camera()
+    with open("config.yaml") as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
 
-    logging.info("Starting sleep analysis, N_DAYS = {}. ".format(N_DAYS))
-    start_schedule(camera)
+    # Setup logging
+    logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")), level=logging.DEBUG)
 
+    capturer = SleepCapturer(config)
+    capturer.start_schedule()
     logging.info("Done. ")
