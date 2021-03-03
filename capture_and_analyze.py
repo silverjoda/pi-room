@@ -59,47 +59,47 @@ class SleepCapturer:
     def start_schedule(self):
         logging.info(f"Starting sleep capture schedule, n_days = {config['n_days']}, current time: {datetime.datetime.now()}. ")
 
-        for d in range(self.config["n_days"]):
+        for day in range(self.config["n_days"]):
             # Make dirs for that day
-            data_folders = [f"raw_images/day-{d}", f"audio/day-{d}"]
+            data_folders = [f"raw_images/day-{day}", f"audio/day-{day}"]
             for df in data_folders:
                 if not os.path.exists(df):
                     os.makedirs(df)
 
-            logging.info("Day: {}, waiting until {}'th hour to start capture. ".format(d, CAPTURE_BEGIN_HOUR))
+            logging.info("Day: {}, waiting until {}'th hour to start capture. ".format(day, self.config["capture_end_hour"]))
 
             # Wait for the initial capture hour to begin. Sleep in between so as not to waste CPU power
-            while datetime.datetime.now().hour < CAPTURE_BEGIN_HOUR: time.sleep(10)
+            while datetime.datetime.now().hour < self.config["capture_end_hour"]: time.sleep(10)
 
             # Launch audio recording in separate thread
             #thread = Thread(target=start_audio_recording, args = (d, ))
             #thread.start()
 
             # Start capturing until end hour
-            images = self.capture_image_every_interval_until()
+            images = self.capture_image_every_interval_until(day)
 
             # Save compressed images for future analysis
             logging.info("Saving images. ")
-            save_dir = f"npz_images/images_day-{d}.npy"
+            save_dir = f"npz_images/compressed_images_day-{day}.npz"
             np.savez(save_dir, images)
 
             # Perform analysis on daily images
-            analyze(images, d)
+            self.analyze(images, day)
 
             # Wait for audio thread to join
             logging.debug("Waiting for audio thread to join. ")
-            thread.join()
+            #thread.join()
 
-    def analyze(pic_array, d):
-        N = len(pic_array)
-        logging.info("Analyzing image sequence of len={}. ".format(N))
+    def analyze(self, images, day):
+        N = len(images)
+        logging.info(f"Analyzing image sequence of len={N}. ")
 
         deltas = []
         for i in range(N - 1):
-            delta = np.mean(np.square(pic_array[i + 1] - pic_array[i]))
+            delta = np.mean(np.square(images[i + 1] - images[i]))
             deltas.append(delta)
 
-        t = np.linspace(CAPTURE_BEGIN_HOUR, CAPTURE_END_HOUR, N - 1)
+        t = np.linspace(self.config["capture_begin_hour"], self.config["capture_end_hour"], N - 1)
         fig, ax = plt.subplots()
         ax.plot(t, deltas)
         plt.xlabel('Hours')
@@ -107,14 +107,13 @@ class SleepCapturer:
         plt.margins(x=0)
 
         # Save plot to image format
-        plt.savefig("analysis/images_Day-{}.png".format(d))
+        plt.savefig("analysis/images-day-{}.png".format(day))
 
     def test_shoot_and_save(self, path="tst.png"):
         im = self.take_picture()
         im_pil = Image.fromarray(im)
         im_pil.save(path)
         print(f"Shot and saved image to {path}")
-
 
 if __name__ == '__main__':
     data_folders = ["audio", "logs", "raw_images", "npz_images", "analysis", "scripts"]
