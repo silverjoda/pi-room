@@ -110,6 +110,9 @@ if __name__ == '__main__':
     logging.basicConfig(filename='logs/log_{}.log'.format(time.strftime("%Y%m%d-%H%M%S")), level=logging.INFO)
     camera = setup_camera()
 
+    shoot_and_save(".")
+    exit()
+
     logging.info("Starting sleep analysis, N_DAYS = {}. ".format(N_DAYS))
     start_schedule(camera)
 
