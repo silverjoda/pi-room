@@ -1,6 +1,6 @@
 "camera_resolution" : (640, 480)
 "resized_resolution" : (320, 240)
 "n_days" : 1
-"capture_begin_hour" : 0
-"capture_end_hour" : 7
+"capture_begin_hour" : 17 # 0 
+"capture_end_hour" : 18 # 7
 "capture_sleep_interval_secs" : 60

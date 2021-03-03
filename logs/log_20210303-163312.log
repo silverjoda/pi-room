@@ -1,0 +1,3 @@
+INFO:root:Setting up camera. 
+INFO:root:Starting sleep capture schedule, n_days = 1, current time: 2021-03-03 16:33:13.030557. 
+INFO:root:Day: 0, waiting until 18'th hour to start capture. 
