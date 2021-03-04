@@ -14,7 +14,7 @@ import yaml
 class SleepCapturer:
     def __init__(self, config):
         self.config = config
-        self.camera = self.setup_camera()
+        self.setup_camera()
 
     def setup_camera(self):
         logging.info("Setting up camera. ")
@@ -41,7 +41,7 @@ class SleepCapturer:
             pics_list_gs.append(im_gs)
 
             # Save image raw to disk
-            save_path = f"raw_images/day-{day}/hour_{datetime.datetime.now().hour}_img{len(pics_list_gs)}"
+            save_path = f"raw_images/day-{day}/hour_{datetime.datetime.now().hour}_img{len(pics_list_gs)}.png"
             im_pil = Image.fromarray(im)
             im_pil.save(save_path)
 
