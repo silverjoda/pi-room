@@ -69,7 +69,7 @@ class SleepCapturer:
             logging.info("Day: {}, waiting until {}'th hour to start capture. ".format(day, self.config["capture_begin_hour"]))
 
             # Wait for the initial capture hour to begin. Sleep in between so as not to waste CPU power
-            while datetime.datetime.now().hour < self.config["capture_begin_hour"]: time.sleep(10)
+            while datetime.datetime.now().hour != self.config["capture_begin_hour"]: time.sleep(10)
 
             # Launch audio recording in separate thread
             #thread = Thread(target=start_audio_recording, args = (d, ))
