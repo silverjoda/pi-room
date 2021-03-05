@@ -75,8 +75,8 @@ class SleepCapturer:
             while datetime.datetime.now().hour != self.config["capture_begin_hour"]: time.sleep(10)
 
             # Launch audio recording in separate thread
-            #thread = Thread(target=start_audio_recording, args = (d, ))
-            #thread.start()
+            thread = Thread(target=self.start_audio_recording, args = (day,))
+            thread.start()
 
             # Start capturing until end hour
             images = self.capture_image_every_interval_until(day)
@@ -91,7 +91,7 @@ class SleepCapturer:
 
             # Wait for audio thread to join
             logging.debug("Waiting for audio thread to join. ")
-            #thread.join()
+            thread.join()
 
     def analyze(self, images, day):
         N = len(images)
