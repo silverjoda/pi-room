@@ -25,7 +25,10 @@ class SleepCapturer:
 
     def take_picture(self):
         im = np.empty((self.camera_resolution[1], self.camera_resolution[0], 3), dtype=np.uint8)
-        self.camera.capture(im, 'rgb', resize=(self.resized_resolution[0], self.resized_resolution[1]))
+        self.camera.capture(im, 'rgb')
+        im = Image.fromarray(im)
+        im = im.resize((self.resized_resolution[0], self.resized_resolution[1]))
+        im = np.array(im, dtype=np.uint8)
         logging.debug("Took image at {}. Min: {}, Max: {}. ".format(time.time(), im.min(), im.max()))
         return im
 
